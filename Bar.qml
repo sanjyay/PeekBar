@@ -27,16 +27,6 @@ Item {
   readonly property int hideDelay: Math.max(50, (barConfig && typeof barConfig.hideDelay === "number" ? barConfig.hideDelay : 300))
   readonly property int animationDuration: Math.max(0, (barConfig && typeof barConfig.animationDuration === "number" ? barConfig.animationDuration : 150))
 
-  // Returns true if any module on the specified screen has an active opened popup
-  function hasOpenPopupOnScreen(screenName) {
-    if (!moduleSlots) return false
-    for (var i = 0; i < moduleSlots.length; i++) {
-      var slot = moduleSlots[i]
-      if (!slot || !slot.activeItem) continue
-      if (slotScreenName(slot) === screenName && slot.activeItem.opened === true) return true
-    }
-    return false
-  }
 
   // Synchronize Hyprland workspace state when compositor events fire
   Connections {

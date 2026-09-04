@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "author": "sanjyay",
   "license": "MIT",
-  "description": "Omarchy bar with fullscreen edge-triggered peek reveal",
+  "description": "Omarchy bar with edge-triggered peek reveal over fullscreen applications without disturbing client state or focus.",
   "kinds": [
     "bar"
   ],
