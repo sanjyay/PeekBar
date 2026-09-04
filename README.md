@@ -39,7 +39,7 @@ When your pointer leaves the bar and any active popup, PeekBar smoothly slides o
 ### Via Omarchy Plugin Manager (omarchyplugins.com)
 
 ```bash
-omarchy plugin add https://github.com/sanjyay/peekbar.git --enable
+omarchy plugin add https://github.com/sanjyyayy/peekbar.git --enable
 ```
 
 ### Manual / Git Clone
@@ -47,7 +47,7 @@ omarchy plugin add https://github.com/sanjyay/peekbar.git --enable
 Clone or link the repository into your Omarchy plugins directory:
 
 ```bash
-git clone https://github.com/sanjyay/peekbar.git ~/.config/omarchy/plugins/peekbar
+git clone https://github.com/sanjyyayy/peekbar.git ~/.config/omarchy/plugins/peekbar
 ```
 
 ---
