@@ -6,6 +6,15 @@ import Quickshell.Wayland
 // PeekBarController coordinates the fullscreen detection and reveal state
 // machine for a single monitor. Isolating this per-monitor controller ensures
 // that multi-monitor setups behave independently without global state pollution.
+//
+// State machine:
+//   NORMAL              → no fullscreen window
+//   FULLSCREEN_HIDDEN   → fullscreen window, bar parked off-screen
+//   FULLSCREEN_REVEALED → fullscreen window, bar visible at top
+//
+// pointerActive = trigger OR bar surface OR active popup
+// Trigger stays visible (mapped) even when bar is revealed so that
+// the cursor sliding from trigger → bar never loses hover continuity.
 QtObject {
   id: controller
 
@@ -36,19 +45,19 @@ QtObject {
   readonly property int stateFullscreenHidden: 1
   readonly property int stateFullscreenRevealed: 2
 
-  // Reveal & hover state
-  property bool revealed: false
+  // Individual hover inputs — set by Bar.qml and TriggerPanel.qml
   property bool triggerHovered: false
   property bool barSurfaceHovered: false
-  property bool popupHovered: false
-  property bool revealHold: false
+  property bool popupHovered: false     // Set by Bar.qml's popout tracking
 
-  // Emitted when hide timer expires so Bar can dismiss any active widget popup
+  // Derived: pointer is over any part of the peekbar system
+  readonly property bool pointerActive: triggerHovered || barSurfaceHovered || popupHovered
+
+  // Reveal state
+  property bool revealed: false
+
+  // Emitted when hide timer fires so Bar can dismiss any open widget popup
   signal closePopoutRequested()
-
-  // Pointer is considered active if cursor is over trigger, bar, active popup,
-  // or held during entry animation so unmapping the trigger doesn't flicker.
-  readonly property bool pointerActive: triggerHovered || barSurfaceHovered || popupHovered || revealHold
 
   // The canonical state machine state
   readonly property int currentState: {
@@ -57,8 +66,7 @@ QtObject {
   }
 
   // Margin targets for bar positioning and slide animations.
-  // In fullscreen mode, hidden bars park just off-screen (-barSize).
-  // When revealed, they return to margin 0 at WlrLayer.Overlay.
+  // Hidden bars park just off-screen (-barSize). Revealed bars sit at margin 0.
   readonly property real targetMarginTop: {
     if (position !== "top") return 0
     if (barHidden) return -barSize
@@ -93,46 +101,39 @@ QtObject {
   readonly property int exclusionMode: (barHidden || isFullscreen) ? ExclusionMode.Ignore : ExclusionMode.Auto
   readonly property int layer: isFullscreen ? WlrLayer.Overlay : WlrLayer.Top
 
-  // Top-edge trigger surface is only mapped while in fullscreen and the bar is not revealed
-  readonly property bool triggerVisible: isFullscreen && !revealed
+  // The trigger surface stays visible whenever fullscreen is active.
+  // Keeping it mapped even when revealed means the cursor sliding between
+  // trigger and bar never has a gap where hover is on neither surface.
+  // The trigger is placed above the fullscreen app but below the bar in the
+  // overlay stack. Being 2px tall it is invisible behind the 35px bar.
+  readonly property bool triggerVisible: isFullscreen
 
   onIsFullscreenChanged: {
     if (isFullscreen) {
       console.log("PeekBar: fullscreen entered on " + (screenName || "display"))
-      revealed = false
-      revealHold = false
-      revealTimer.stop()
-      revealHoldTimer.stop()
-      hideTimer.stop()
     } else {
       console.log("PeekBar: fullscreen exited on " + (screenName || "display"))
-      revealed = false
-      revealHold = false
-      revealTimer.stop()
-      revealHoldTimer.stop()
-      hideTimer.stop()
     }
+    // Always reset on fullscreen state change
+    revealed = false
+    revealTimer.stop()
+    hideTimer.stop()
   }
 
   onRevealedChanged: {
     if (revealed) {
       console.log("PeekBar: bar revealed on " + (screenName || "display"))
-      // Hold pointerActive during entry animation so unmapping the trigger surface
-      // does not cause a premature hide countdown before the bar arrives under pointer.
-      revealHold = true
-      revealHoldTimer.restart()
     } else if (isFullscreen) {
       console.log("PeekBar: bar hidden on " + (screenName || "display"))
-      revealHold = false
-      revealHoldTimer.stop()
     }
   }
 
-  onPointerActiveChanged: {
+  // React to trigger hover: start reveal when entering, start hide when leaving
+  onTriggerHoveredChanged: {
     if (!isFullscreen) return
-    if (pointerActive) {
+    if (triggerHovered) {
       hideTimer.stop()
-      if (!revealed && triggerHovered) {
+      if (!revealed) {
         if (revealDelay > 0) {
           revealTimer.restart()
         } else {
@@ -140,21 +141,34 @@ QtObject {
         }
       }
     } else {
+      // Trigger left — only start hide if bar and popup are also not hovered
       revealTimer.stop()
-      if (revealed) {
+      if (!barSurfaceHovered && !popupHovered && revealed) {
         hideTimer.restart()
       }
     }
   }
 
-  // Grace period timer while the bar is sliding into view
-  property var revealHoldTimer: Timer {
-    interval: Math.max(100, controller.animationDuration + 100)
-    repeat: false
-    onTriggered: {
-      controller.revealHold = false
-      if (controller.revealed && !controller.pointerActive && controller.isFullscreen) {
-        controller.hideTimer.restart()
+  // React to bar surface hover: cancel hide when entering, start hide when leaving
+  onBarSurfaceHoveredChanged: {
+    if (!isFullscreen) return
+    if (barSurfaceHovered) {
+      hideTimer.stop()
+    } else {
+      if (!triggerHovered && !popupHovered && revealed) {
+        hideTimer.restart()
+      }
+    }
+  }
+
+  // React to popup hover: cancel hide when entering, start hide when leaving
+  onPopupHoveredChanged: {
+    if (!isFullscreen) return
+    if (popupHovered) {
+      hideTimer.stop()
+    } else {
+      if (!triggerHovered && !barSurfaceHovered && revealed) {
+        hideTimer.restart()
       }
     }
   }
@@ -164,18 +178,18 @@ QtObject {
     interval: controller.revealDelay
     repeat: false
     onTriggered: {
-      if (controller.triggerHovered) {
+      if (controller.triggerHovered && controller.isFullscreen) {
         controller.revealed = true
       }
     }
   }
 
-  // Hide timer with debouncing to prevent flicker
+  // Hide timer — debounced so brief pointer gaps don't flicker
   property var hideTimer: Timer {
     interval: controller.hideDelay
     repeat: false
     onTriggered: {
-      if (!controller.pointerActive) {
+      if (!controller.pointerActive && controller.isFullscreen) {
         controller.revealed = false
         controller.closePopoutRequested()
       }

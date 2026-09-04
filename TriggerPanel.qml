@@ -7,13 +7,20 @@ import Quickshell.Wayland
 // Using WlrLayer.Overlay ensures it is placed above the fullscreen application.
 // Setting exclusionMode to Ignore guarantees the fullscreen application is never
 // resized, moved, or affected in any way.
+//
+// The trigger stays mapped whenever fullscreen is active — even after the bar
+// reveals — so the cursor sliding from the 2px trigger into the bar surface
+// is always covered by at least one hover surface. When the bar is revealed and
+// sits at margin 0, the trigger (2px tall) is hidden behind the bar (35px tall),
+// so it is visually invisible but still receives pointer events at y=0..1.
 PanelWindow {
   id: triggerWin
 
   required property var controller
 
   screen: controller.screen
-  visible: controller.triggerVisible
+  // Keep mapped for the entire duration of fullscreen — see comment above.
+  visible: controller.isFullscreen
   exclusionMode: ExclusionMode.Ignore
   color: "transparent"
   surfaceFormat.opaque: false

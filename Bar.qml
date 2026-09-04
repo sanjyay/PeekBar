@@ -342,6 +342,8 @@ Item {
     }, Qt.size(grabWidth, grabHeight))
   }
 
+  // Registry of per-monitor controllers so requestPopout/releasePopout can
+  // update popupHovered on all of them simultaneously.
   property var peekControllers: []
 
   function registerPeekController(ctrl) {
@@ -362,90 +364,11 @@ Item {
     }
   }
 
-  property var activePopoutConnection: null
-  property var activeDismissConnection: null
-
-  function cleanupPopoutTracking() {
-    if (activePopoutConnection) {
-      try { activePopoutConnection.destroy() } catch (e) {}
-      activePopoutConnection = null
-    }
-    if (activeDismissConnection) {
-      try { activeDismissConnection.destroy() } catch (e) {}
-      activeDismissConnection = null
-    }
-    setControllersPopupHovered(false)
-  }
-
-  function updatePopoutTracking() {
-    cleanupPopoutTracking()
-    if (!activePopout) return
-
-    // 1. Direct containsMouse support (PopupCard and standard hover components)
-    if (activePopout.containsMouse !== undefined) {
-      activePopoutConnection = popoutConnectionComponent.createObject(root, {
-        target: activePopout
-      })
-      if (activePopout.containsMouse === true) {
-        setControllersPopupHovered(true)
-      }
-    }
-
-    // 2. PanelWindow / KeyboardPanel card geometry tracking
-    var panelWin = findPanelWindow(activePopout)
-    if (panelWin) {
-      if (panelWin.containsMouse !== undefined && panelWin !== activePopout) {
-        activePopoutConnection = popoutConnectionComponent.createObject(root, {
-          target: panelWin
-        })
-      }
-
-      var da = findDismissArea(panelWin)
-      if (da) {
-        activeDismissConnection = dismissConnectionComponent.createObject(root, {
-          target: da,
-          panelWindow: panelWin
-        })
-      }
-    }
-  }
-
-  Component {
-    id: popoutConnectionComponent
-    Connections {
-      ignoreUnknownSignals: true
-      function onContainsMouseChanged() {
-        if (target && target.containsMouse !== undefined) {
-          root.setControllersPopupHovered(target.containsMouse === true)
-        }
-      }
-    }
-  }
-
-  Component {
-    id: dismissConnectionComponent
-    Connections {
-      property var panelWindow: null
-      ignoreUnknownSignals: true
-      function onPositionChanged(mouse) {
-        if (!panelWindow || !target) return
-        var mx = mouse.x, my = mouse.y
-        var orig = panelWindow.cardOrigin
-        var cw = panelWindow.contentWidth || 0
-        var ch = panelWindow.contentHeight || 0
-        var inCard = false
-        if (orig && cw > 0 && ch > 0) {
-          inCard = mx >= orig.x && mx <= orig.x + cw && my >= orig.y && my <= orig.y + ch
-        }
-        if (inCard) {
-          root.setControllersPopupHovered(true)
-        } else if (!target.hoveringBar) {
-          root.setControllersPopupHovered(false)
-        }
-      }
-    }
-  }
-
+  // requestPopout is called by widgets when they open a popup.
+  // We immediately mark the popup as "hovered" so the hide timer cannot fire
+  // while the user is interacting with a widget — regardless of where the
+  // cursor travels within the popup window. The bar and popup stay visible
+  // until the popup closes (releasePopout) and the cursor leaves the bar area.
   function requestPopout(owner) {
     if (activePopout === owner) return
     if (activePopout) {
@@ -453,45 +376,29 @@ Item {
       else if ("close" in activePopout) activePopout.close()
     }
     activePopout = owner
-    updatePopoutTracking()
+    setControllersPopupHovered(true)
   }
 
-  function findPanelWindow(obj) {
-    if (!obj) return null
-    if (obj.cardOrigin !== undefined) return obj
-    if (obj.containsMouse !== undefined && obj.open !== undefined) return obj
-    var list = (obj.data || []).concat(obj.resources || []).concat(obj.children || [])
-    for (var i = 0; i < list.length; i++) {
-      var res = findPanelWindow(list[i])
-      if (res) return res
-    }
-    return null
-  }
-
-  function findDismissArea(pw) {
-    if (!pw || !pw.data) return null
-    for (var i = 0; i < pw.data.length; i++) {
-      var item = pw.data[i]
-      if (item && item.hoveringBar !== undefined) return item
-    }
-    return null
-  }
-
+  // releasePopout is called by widgets when their popup closes.
+  // Clearing popupHovered allows the normal hide timer logic to resume.
   function releasePopout(owner) {
     if (activePopout === owner) {
       activePopout = null
-      cleanupPopoutTracking()
+      setControllersPopupHovered(false)
     }
   }
 
+  // closeActivePopout is called by PeekBarController when the hide timer fires
+  // while a popup is open — this dismisses the popup cleanly.
   function closeActivePopout() {
     if (activePopout) {
       if ("closeForPopoutSwitch" in activePopout) activePopout.closeForPopoutSwitch()
       else if ("close" in activePopout) activePopout.close()
       activePopout = null
     }
-    cleanupPopoutTracking()
+    setControllersPopupHovered(false)
   }
+
 
   readonly property bool vertical: position === "left" || position === "right"
   readonly property int barSize: vertical ? Style.bar.sizeVertical : Style.bar.sizeHorizontal
