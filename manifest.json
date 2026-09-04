@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "id": "sanjyay.peekbar",
+  "id": "sanjyyayy.peekbar",
   "name": "PeekBar",
-  "version": "1.0.0",
-  "author": "sanjyay",
+  "version": "1.0.1",
+  "author": "sanjyyayy",
   "license": "MIT",
   "description": "Omarchy bar with edge-triggered peek reveal over fullscreen applications without disturbing client state or focus.",
   "kinds": [
