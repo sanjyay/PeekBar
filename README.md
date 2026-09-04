@@ -13,34 +13,9 @@ PeekBar is a full `kind: bar` replacement plugin for the [Omarchy](https://githu
 
 ## The Experience
 
-```text
-NORMAL (Tiled or floating windows)
-┌─────────────────────────────────┐
-│            PeekBar              │ (WlrLayer.Top, exclusive zone reserved)
-├─────────────────────────────────┤
-│                                 │
-│           application           │
-│                                 │
-└─────────────────────────────────┘
 
-FULLSCREEN (Bar hidden, canvas maximized)
-┌─────────────────────────────────┐ ← 2px invisible overlay trigger
-│                                 │
-│                                 │
-│       fullscreen application    │ (Window stays fullscreen, exclusive zone = 0)
-│                                 │
-│                                 │
-└─────────────────────────────────┘
+https://github.com/user-attachments/assets/d7b2146b-8143-4c5e-befc-6f07d7689a36
 
-FULLSCREEN + HOVER (Bar smoothly revealed)
-┌─────────────────────────────────┐
-│            PeekBar              │ (WlrLayer.Overlay above fullscreen surface)
-├─────────────────────────────────┤
-│                                 │
-│       fullscreen application    │ (Window remains 100% fullscreen, no resize)
-│                                 │
-└─────────────────────────────────┘
-```
 
 When your pointer leaves the bar and any active popup, PeekBar smoothly slides out of view after a debounced delay (default `300 ms`).
 
@@ -75,29 +50,6 @@ Clone or link the repository into your Omarchy plugins directory:
 git clone https://github.com/sanjyay/peekbar.git ~/.config/omarchy/plugins/peekbar
 ```
 
-### Activating PeekBar
-
-In your `~/.config/omarchy/shell.json`, set `"id": "peekbar"` inside the `"bar"` configuration object:
-
-```json
-{
-  "bar": {
-    "id": "peekbar",
-    "revealInFullscreen": true,
-    "triggerThickness": 2,
-    "revealDelay": 0,
-    "hideDelay": 300,
-    "animationDuration": 150
-  }
-}
-```
-
-Then restart or reload the Omarchy shell:
-
-```bash
-omarchy-restart-shell
-```
-
 ---
 
 ## Configuration
@@ -116,16 +68,6 @@ PeekBar accepts the following configuration keys under the `"bar"` object in `~/
 ---
 
 ## Uninstallation / Reverting
-
-To revert to the stock Omarchy bar at any time, change `"id"` back to `"omarchy.bar"` in `~/.config/omarchy/shell.json`:
-
-```json
-{
-  "bar": {
-    "id": "omarchy.bar"
-  }
-}
-```
 
 To remove the plugin completely:
 
@@ -168,27 +110,6 @@ omarchy-restart-shell
 - [`PeekBarController.qml`](PeekBarController.qml): Per-monitor state machine. Watches Hyprland workspace fullscreen states, tracks trigger and bar hover states, and manages debounced reveal/hide timers.
 - [`TriggerPanel.qml`](TriggerPanel.qml): Dedicated 2px edge `PanelWindow` on `WlrLayer.Overlay` with `ExclusionMode.Ignore` and `WlrKeyboardFocus.None` that catches top-edge pointer hover without intercepting clicks.
 - [`BarModel.js`](BarModel.js): Upstream layout normalization and tray alignment utilities.
-
----
-
-## omarchyplugins.com Compliance
-
-PeekBar strictly adheres to the [omarchyplugins.com](https://omarchyplugins.com) v1 specification:
-
-| Check | Requirement | Status |
-| :--- | :--- | :--- |
-| **Manifest Contract** | `schemaVersion: 1` present and valid | Passed |
-| **Plugin ID** | Safe, namespaced identifier (`peekbar`) without reserved `omarchy.*` prefix | Passed |
-| **Declared Kinds** | Non-empty array specifying `["bar"]` | Passed |
-| **Entry Point** | Safe relative path pointing to existing file (`Bar.qml`) | Passed |
-| **Filesystem Safety** | Zero symlinks in repository tree | Passed |
-| **Validation** | Verified with official `omarchy plugin validate .` | Passed (Exit 0) |
-
-### Marketplace Listing Metadata
-
-- **Name**: PeekBar
-- **Category**: Desktop / Appearance
-- **Tags**: `bar`, `fullscreen`, `hyprland`, `quickshell`
 
 ---
 
