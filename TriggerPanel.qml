@@ -33,9 +33,13 @@ PanelWindow {
   implicitWidth: controller.vertical ? controller.triggerThickness : 0
   implicitHeight: controller.vertical ? 0 : controller.triggerThickness
 
-  HoverHandler {
-    id: triggerHoverHandler
-    onHoveredChanged: controller.triggerHovered = hovered
-    Component.onDestruction: if (hovered) controller.triggerHovered = false
+  Item {
+    anchors.fill: parent
+
+    HoverHandler {
+      id: triggerHoverHandler
+      onHoveredChanged: controller.triggerHovered = hovered
+      Component.onDestruction: if (hovered) controller.triggerHovered = false
+    }
   }
 }

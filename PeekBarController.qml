@@ -23,9 +23,6 @@ QtObject {
   property int hideDelay: 300
   property int animationDuration: 150
 
-  // Callback to query if any widget popup is currently open on this screen
-  property var popupCheckCallback: null
-
   // Monitor identity
   readonly property string screenName: screen && screen.name ? String(screen.name) : ""
   readonly property var hyprMonitor: Hyprland.monitorFor(screen)
@@ -39,17 +36,19 @@ QtObject {
   readonly property int stateFullscreenHidden: 1
   readonly property int stateFullscreenRevealed: 2
 
-  // Reveal state
+  // Reveal & hover state
   property bool revealed: false
   property bool triggerHovered: false
   property bool barSurfaceHovered: false
+  property bool popupHovered: false
+  property bool revealHold: false
 
-  // True if any interactive element or popup is keeping the bar open
-  function isAnyPopupOpen(): bool {
-    return typeof popupCheckCallback === "function" ? popupCheckCallback(screenName) : false
-  }
+  // Emitted when hide timer expires so Bar can dismiss any active widget popup
+  signal closePopoutRequested()
 
-  readonly property bool pointerActive: triggerHovered || barSurfaceHovered
+  // Pointer is considered active if cursor is over trigger, bar, active popup,
+  // or held during entry animation so unmapping the trigger doesn't flicker.
+  readonly property bool pointerActive: triggerHovered || barSurfaceHovered || popupHovered || revealHold
 
   // The canonical state machine state
   readonly property int currentState: {
@@ -101,12 +100,16 @@ QtObject {
     if (isFullscreen) {
       console.log("PeekBar: fullscreen entered on " + (screenName || "display"))
       revealed = false
+      revealHold = false
       revealTimer.stop()
+      revealHoldTimer.stop()
       hideTimer.stop()
     } else {
       console.log("PeekBar: fullscreen exited on " + (screenName || "display"))
       revealed = false
+      revealHold = false
       revealTimer.stop()
+      revealHoldTimer.stop()
       hideTimer.stop()
     }
   }
@@ -114,35 +117,44 @@ QtObject {
   onRevealedChanged: {
     if (revealed) {
       console.log("PeekBar: bar revealed on " + (screenName || "display"))
+      // Hold pointerActive during entry animation so unmapping the trigger surface
+      // does not cause a premature hide countdown before the bar arrives under pointer.
+      revealHold = true
+      revealHoldTimer.restart()
     } else if (isFullscreen) {
       console.log("PeekBar: bar hidden on " + (screenName || "display"))
+      revealHold = false
+      revealHoldTimer.stop()
     }
   }
 
-  onTriggerHoveredChanged: {
+  onPointerActiveChanged: {
     if (!isFullscreen) return
-    if (triggerHovered) {
+    if (pointerActive) {
       hideTimer.stop()
-      if (revealDelay > 0) {
-        revealTimer.restart()
-      } else {
-        revealed = true
+      if (!revealed && triggerHovered) {
+        if (revealDelay > 0) {
+          revealTimer.restart()
+        } else {
+          revealed = true
+        }
       }
     } else {
       revealTimer.stop()
-      if (revealed && !pointerActive && !isAnyPopupOpen()) {
+      if (revealed) {
         hideTimer.restart()
       }
     }
   }
 
-  onBarSurfaceHoveredChanged: {
-    if (!isFullscreen) return
-    if (barSurfaceHovered) {
-      hideTimer.stop()
-    } else {
-      if (revealed && !pointerActive && !isAnyPopupOpen()) {
-        hideTimer.restart()
+  // Grace period timer while the bar is sliding into view
+  property var revealHoldTimer: Timer {
+    interval: Math.max(100, controller.animationDuration + 100)
+    repeat: false
+    onTriggered: {
+      controller.revealHold = false
+      if (controller.revealed && !controller.pointerActive && controller.isFullscreen) {
+        controller.hideTimer.restart()
       }
     }
   }
@@ -163,8 +175,9 @@ QtObject {
     interval: controller.hideDelay
     repeat: false
     onTriggered: {
-      if (!controller.pointerActive && !controller.isAnyPopupOpen()) {
+      if (!controller.pointerActive) {
         controller.revealed = false
+        controller.closePopoutRequested()
       }
     }
   }

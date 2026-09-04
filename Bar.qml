@@ -342,6 +342,110 @@ Item {
     }, Qt.size(grabWidth, grabHeight))
   }
 
+  property var peekControllers: []
+
+  function registerPeekController(ctrl) {
+    if (!ctrl || peekControllers.indexOf(ctrl) !== -1) return
+    var next = peekControllers.slice()
+    next.push(ctrl)
+    peekControllers = next
+  }
+
+  function unregisterPeekController(ctrl) {
+    peekControllers = peekControllers.filter(function(c) { return c !== ctrl })
+  }
+
+  function setControllersPopupHovered(hovered) {
+    for (var i = 0; i < peekControllers.length; i++) {
+      var c = peekControllers[i]
+      if (c) c.popupHovered = hovered
+    }
+  }
+
+  property var activePopoutConnection: null
+  property var activeDismissConnection: null
+
+  function cleanupPopoutTracking() {
+    if (activePopoutConnection) {
+      try { activePopoutConnection.destroy() } catch (e) {}
+      activePopoutConnection = null
+    }
+    if (activeDismissConnection) {
+      try { activeDismissConnection.destroy() } catch (e) {}
+      activeDismissConnection = null
+    }
+    setControllersPopupHovered(false)
+  }
+
+  function updatePopoutTracking() {
+    cleanupPopoutTracking()
+    if (!activePopout) return
+
+    // 1. Direct containsMouse support (PopupCard and standard hover components)
+    if (activePopout.containsMouse !== undefined) {
+      activePopoutConnection = popoutConnectionComponent.createObject(root, {
+        target: activePopout
+      })
+      if (activePopout.containsMouse === true) {
+        setControllersPopupHovered(true)
+      }
+    }
+
+    // 2. PanelWindow / KeyboardPanel card geometry tracking
+    var panelWin = findPanelWindow(activePopout)
+    if (panelWin) {
+      if (panelWin.containsMouse !== undefined && panelWin !== activePopout) {
+        activePopoutConnection = popoutConnectionComponent.createObject(root, {
+          target: panelWin
+        })
+      }
+
+      var da = findDismissArea(panelWin)
+      if (da) {
+        activeDismissConnection = dismissConnectionComponent.createObject(root, {
+          target: da,
+          panelWindow: panelWin
+        })
+      }
+    }
+  }
+
+  Component {
+    id: popoutConnectionComponent
+    Connections {
+      ignoreUnknownSignals: true
+      function onContainsMouseChanged() {
+        if (target && target.containsMouse !== undefined) {
+          root.setControllersPopupHovered(target.containsMouse === true)
+        }
+      }
+    }
+  }
+
+  Component {
+    id: dismissConnectionComponent
+    Connections {
+      property var panelWindow: null
+      ignoreUnknownSignals: true
+      function onPositionChanged(mouse) {
+        if (!panelWindow || !target) return
+        var mx = mouse.x, my = mouse.y
+        var orig = panelWindow.cardOrigin
+        var cw = panelWindow.contentWidth || 0
+        var ch = panelWindow.contentHeight || 0
+        var inCard = false
+        if (orig && cw > 0 && ch > 0) {
+          inCard = mx >= orig.x && mx <= orig.x + cw && my >= orig.y && my <= orig.y + ch
+        }
+        if (inCard) {
+          root.setControllersPopupHovered(true)
+        } else if (!target.hoveringBar) {
+          root.setControllersPopupHovered(false)
+        }
+      }
+    }
+  }
+
   function requestPopout(owner) {
     if (activePopout === owner) return
     if (activePopout) {
@@ -349,10 +453,44 @@ Item {
       else if ("close" in activePopout) activePopout.close()
     }
     activePopout = owner
+    updatePopoutTracking()
+  }
+
+  function findPanelWindow(obj) {
+    if (!obj) return null
+    if (obj.cardOrigin !== undefined) return obj
+    if (obj.containsMouse !== undefined && obj.open !== undefined) return obj
+    var list = (obj.data || []).concat(obj.resources || []).concat(obj.children || [])
+    for (var i = 0; i < list.length; i++) {
+      var res = findPanelWindow(list[i])
+      if (res) return res
+    }
+    return null
+  }
+
+  function findDismissArea(pw) {
+    if (!pw || !pw.data) return null
+    for (var i = 0; i < pw.data.length; i++) {
+      var item = pw.data[i]
+      if (item && item.hoveringBar !== undefined) return item
+    }
+    return null
   }
 
   function releasePopout(owner) {
-    if (activePopout === owner) activePopout = null
+    if (activePopout === owner) {
+      activePopout = null
+      cleanupPopoutTracking()
+    }
+  }
+
+  function closeActivePopout() {
+    if (activePopout) {
+      if ("closeForPopoutSwitch" in activePopout) activePopout.closeForPopoutSwitch()
+      else if ("close" in activePopout) activePopout.close()
+      activePopout = null
+    }
+    cleanupPopoutTracking()
   }
 
   readonly property bool vertical: position === "left" || position === "right"
@@ -1012,7 +1150,10 @@ Item {
           revealDelay: root.revealDelay
           hideDelay: root.hideDelay
           animationDuration: root.animationDuration
-          popupCheckCallback: root.hasOpenPopupOnScreen
+          onClosePopoutRequested: root.closeActivePopout()
+
+          Component.onCompleted: root.registerPeekController(peekController)
+          Component.onDestruction: root.unregisterPeekController(peekController)
         }
 
         TriggerPanel {
