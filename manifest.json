@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "peekbar",
+  "name": "PeekBar",
+  "version": "1.0.0",
+  "author": "sanjyay",
+  "license": "MIT",
+  "description": "Omarchy bar with fullscreen edge-triggered peek reveal",
+  "kinds": [
+    "bar"
+  ],
+  "entryPoints": {
+    "bar": "Bar.qml"
+  }
+}
