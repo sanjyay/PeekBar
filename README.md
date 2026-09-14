@@ -1,13 +1,8 @@
-# PeekBar
+# PeekBar [![Built for Omarchy: Plugin](https://raw.githubusercontent.com/tcballard/omarchy-badges/75975e5b5bf75e7ede3764bcd2950046f7abfe2c/badges/v1/omarchy-plugin.svg)](https://github.com/tcballard/omarchy-badges)
 
 > **Seamless edge-triggered reveal of the Omarchy bar over fullscreen applications without disturbing window state, geometry, or keyboard focus.**
 
 PeekBar is a full `kind: bar` replacement plugin for the [Omarchy](https://github.com/omarchy/omarchy) desktop environment on Hyprland. When an application enters fullscreen, PeekBar slides out of view to give you an uncompromised full-screen canvas while leaving a minimal, invisible edge trigger. Moving your pointer to the monitor's top edge smoothly reveals PeekBar directly over the fullscreen window — allowing full interaction with all your widgets, workspace icons, and system panels.
-
-[![Omarchy Plugin](https://img.shields.io/badge/omarchy-plugin-blue.svg)](https://omarchyplugins.com)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Kind: bar](https://img.shields.io/badge/kind-bar-green.svg)](#)
-[![Platform: Wayland / Hyprland](https://img.shields.io/badge/platform-Wayland%20%7C%20Hyprland-purple.svg)](#)
 
 ---
 
